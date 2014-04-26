@@ -1,11 +1,12 @@
 ﻿using UnityEditor;
 using UnityEngine;
 using ShaderForge;
+using Holoville.HOEditorUtils;
 using System.IO;
 
 /**
  * Title: Shader Forge Extensions
- * Version: 1.0
+ * Version: 1.1
  * 
  * Author: Lennard Fonteijn
  * Website: http://www.lennardf1989.com
@@ -16,128 +17,195 @@ using System.IO;
  * 
  * Source: http://forum.unity3d.com/threads/242835-Shader-Forge-Extensions?p=1606725
  **/
-public class ShaderForgeExtensions : EditorWindow
+
+namespace LennardF1989.UnityScripts.ShaderForge
 {
-	private Vector2 _scrollPosition;
-	private string[] _clipboards;
+    public class ShaderForgeExtensions : EditorWindow
+    {
+        private SF_SelectionManager Selection
+        {
+            get
+            {
+                try
+                {
+                    return SF_Editor.instance.nodeView.selection;
+                }
+                catch
+                {
+                    return null;
+                }
+            }
+        }
 
-	private SF_SelectionManager _selection
-	{
-		get { return SF_Editor.instance.nodeView.selection; }
-	}
+        private int SelectionCount
+        {
+            get
+            {
+                return Selection == null ? 0 : Selection.Selection.Count;
+            }
+        }
 
-	[MenuItem("Window/Shader Forge Extensions")]
-	public static void Initialize()
-	{
-		EditorWindow.GetWindow<ShaderForgeExtensions>(false, "SF Extensions");
-	}
+        private Vector2 _scrollPosition;
 
-	public ShaderForgeExtensions()
-	{
-		minSize = new Vector2(128, 100);
+        private string _previousFilter;
+        private string _currentFilter;
 
-		_scrollPosition = Vector2.zero;
+        private string[] _clips;
 
-		Refresh();
-	}
+        [MenuItem("Window/Shader Forge Extensions")]
+        public static void Initialize()
+        {
+            GetWindow<ShaderForgeExtensions>();
+        }
 
-	public void Update()
-	{
-		Repaint();
-	}
+        public ShaderForgeExtensions()
+        {
+            HOPanelUtils.SetWindowTitle(this, SF_GUI.Icon, "SF Extensions");
 
-	public void OnGUI()
-	{
-		if (GUILayout.Button(string.Format("Save ({0} nodes)", _selection.Selection.Count)))
-		{
-			if(_selection.Selection.Count > 0)
-			{
-				Save();
-				Refresh();
-			}
-		}
+            minSize = new Vector2(275, 100);
 
-		if (GUILayout.Button("Load"))
-		{
-			Load();
-		}
-		else if (GUILayout.Button("Refresh"))
-		{
-			Refresh();
-		}
+            _scrollPosition = Vector2.zero;
 
-		GUILayout.Box(string.Empty, GUILayout.ExpandWidth(true), GUILayout.Height(1));
+            _previousFilter = _currentFilter = string.Empty;
 
-		_scrollPosition = GUILayout.BeginScrollView(_scrollPosition);
+            Refresh();
+        }
 
-		for (int i = 0; i < _clipboards.Length; i++)
-		{
-			GUILayout.BeginHorizontal();
+        public void Update()
+        {
+            Repaint();
+        }
 
-			if (GUILayout.Button(Path.GetFileNameWithoutExtension(_clipboards[i])))
-			{
-				InternalLoad(_clipboards[i]);
-			}
-			else if(GUILayout.Button("X", GUILayout.Width(20)))
-			{
-				if(EditorUtility.DisplayDialog("Delete clipboard", string.Format("Are you sure you wish to delete {0}?", Path.GetFileNameWithoutExtension(_clipboards[i])), "Yes", "No"))
-				{
-					File.Delete(_clipboards[i]);
+        public void OnGUI()
+        {
+            GUILayout.BeginHorizontal(EditorStyles.toolbar);
 
-					Refresh();
-				}
-			}
+            if (GUILayout.Button(string.Format("Save ({0} nodes)", SelectionCount), EditorStyles.toolbarButton))
+            {
+                Save();
+                Refresh();
+            }
+            else if (GUILayout.Button("Load", EditorStyles.toolbarButton))
+            {
+                Load();
+            }
+            else if (GUILayout.Button("Refresh", EditorStyles.toolbarButton))
+            {
+                Refresh();
+            }
+            else if(GUILayout.Button("?", EditorStyles.toolbarButton, GUILayout.Width(20)))
+            {
+                Application.OpenURL("http://forum.unity3d.com/threads/242835-Shader-Forge-Extensions");
+            }
 
-			GUILayout.EndHorizontal();
-		}
+            GUILayout.EndHorizontal();
 
-		GUILayout.EndScrollView();
-	}
+            GUILayout.BeginHorizontal(EditorStyles.toolbar);
 
-	private void Load()
-	{
-		string fileName = EditorUtility.OpenFilePanel(
-			"Load file to clipboard",
-			Application.dataPath,
-			"sfc"
-			);
-		
-		InternalLoad(fileName);
-	}
+            _previousFilter = _currentFilter;
+            _currentFilter = GUILayout.TextField(_currentFilter, GUI.skin.FindStyle("ToolbarSeachTextField"));
 
-	private void InternalLoad(string fileName)
-	{
-		if(!string.IsNullOrEmpty(fileName))
-		{
-			EditorPrefs.SetString("shaderforge_clipboard", File.ReadAllText(fileName));
-			
-			_selection.PasteFromClipboard();
-			
-			EditorPrefs.SetString("shaderforge_clipboard", string.Empty);
+            if(!_currentFilter.Equals(_previousFilter))
+            {
+                Refresh();
+            }
 
-			GetWindow<SF_Editor>().Focus();
-		}
-	}
-	
-	private void Save()
-	{
-		string fileContents = string.Join("\n", SF_Editor.instance.nodeView.selection.GetSelectionSerialized());
+            if (GUILayout.Button("", GUI.skin.FindStyle("ToolbarSeachCancelButton")))
+            {
+                _previousFilter = _currentFilter = string.Empty;
 
-		string fileName = EditorUtility.SaveFilePanel(
-			"Save selection to file",
-			Application.dataPath,
-			string.Empty,
-			"sfc"
-			);
-		
-		if(!string.IsNullOrEmpty(fileName))
-		{
-			File.WriteAllText(fileName, fileContents);
-		}
-	}
+                GUI.FocusControl(null);
 
-	private void Refresh()
-	{
-		_clipboards = Directory.GetFiles(Application.dataPath + "/", "*.sfc", SearchOption.AllDirectories);
-	}
+                Refresh();
+            }
+
+            GUILayout.EndHorizontal();
+
+            _scrollPosition = GUILayout.BeginScrollView(_scrollPosition);
+
+            foreach (string clip in _clips)
+            {
+                GUILayout.BeginHorizontal();
+
+                if (GUILayout.Button(Path.GetFileNameWithoutExtension(clip)))
+                {
+                    InternalLoad(clip);
+                }
+                else if (GUILayout.Button("X", GUILayout.Width(20)))
+                {
+                    if (EditorUtility.DisplayDialog(
+                        "Delete clipboard",
+                        string.Format("Are you sure you wish to delete {0}?", Path.GetFileNameWithoutExtension(clip)),
+                        "Yes", 
+                        "No")
+                        )
+                    {
+                        File.Delete(clip);
+
+                        Refresh();
+                    }
+                }
+
+                GUILayout.EndHorizontal();
+            }
+
+            GUILayout.EndScrollView();
+        }
+
+        private void Load()
+        {
+            string fileName = EditorUtility.OpenFilePanel(
+                "Load file to clipboard",
+                Application.dataPath,
+                "sfc"
+                );
+
+            InternalLoad(fileName);
+        }
+
+        private void InternalLoad(string fileName)
+        {
+            if (Selection == null || string.IsNullOrEmpty(fileName))
+            {
+                return;
+            }
+
+            EditorPrefs.SetString("shaderforge_clipboard", File.ReadAllText(fileName));
+
+            Selection.PasteFromClipboard();
+
+            EditorPrefs.SetString("shaderforge_clipboard", string.Empty);
+
+            GetWindow<SF_Editor>().Focus();
+        }
+
+        private void Save()
+        {
+            if(Selection == null || SelectionCount == 0)
+            {
+                return;
+            }
+
+            string fileContents = string.Join("\n", Selection.GetSelectionSerialized());
+
+            string fileName = EditorUtility.SaveFilePanel(
+                "Save selection to file",
+                Application.dataPath,
+                string.Empty,
+                "sfc"
+                );
+
+            if (!string.IsNullOrEmpty(fileName))
+            {
+                File.WriteAllText(fileName, fileContents);
+            }
+        }
+
+        private void Refresh()
+        {
+            string searchFilter = (string.IsNullOrEmpty(_currentFilter)) ? "*.sfc" : string.Format("*{0}*.sfc", _currentFilter);
+
+            _clips = Directory.GetFiles(Application.dataPath + "/", searchFilter, SearchOption.AllDirectories);
+        }
+    }
 }
