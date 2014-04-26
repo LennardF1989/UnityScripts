@@ -1,12 +1,6 @@
-﻿using UnityEditor;
-using UnityEngine;
-using ShaderForge;
-using Holoville.HOEditorUtils;
-using System.IO;
-
-/**
+﻿/**
  * Title: Shader Forge Extensions
- * Version: 1.1
+ * Version: 1.1.1
  * 
  * Author: Lennard Fonteijn
  * Website: http://www.lennardf1989.com
@@ -15,8 +9,14 @@ using System.IO;
  * although this is not a requirement. As long as you give credits where credits are due with 
  * a link to the topic below.
  * 
- * Source: http://forum.unity3d.com/threads/242835-Shader-Forge-Extensions?p=1606725
+ * Source: http://forum.unity3d.com/threads/242835-Shader-Forge-Extensions
  **/
+
+using System.IO;
+using Holoville.HOEditorUtils;
+using ShaderForge;
+using UnityEditor;
+using UnityEngine;
 
 namespace LennardF1989.UnityScripts.ShaderForge
 {
@@ -205,7 +205,14 @@ namespace LennardF1989.UnityScripts.ShaderForge
         {
             string searchFilter = (string.IsNullOrEmpty(_currentFilter)) ? "*.sfc" : string.Format("*{0}*.sfc", _currentFilter);
 
-            _clips = Directory.GetFiles(Application.dataPath + "/", searchFilter, SearchOption.AllDirectories);
+            try
+            {
+                _clips = Directory.GetFiles(Application.dataPath, searchFilter, SearchOption.AllDirectories);
+            }
+            catch
+            {
+                _clips = new string[0];
+            }
         }
     }
 }
