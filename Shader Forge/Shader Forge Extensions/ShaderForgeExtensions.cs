@@ -1,6 +1,6 @@
 ﻿/**
  * Title: Shader Forge Extensions
- * Version: 1.1.1
+ * Version: 1.2
  * 
  * Author: Lennard Fonteijn
  * Website: http://www.lennardf1989.com
@@ -22,7 +22,7 @@ namespace LennardF1989.UnityScripts.ShaderForge
 {
     public class ShaderForgeExtensions : EditorWindow
     {
-        private SF_SelectionManager Selection
+        private SF_SelectionManager SelectionManager
         {
             get
             {
@@ -39,10 +39,12 @@ namespace LennardF1989.UnityScripts.ShaderForge
 
         private int SelectionCount
         {
-            get
-            {
-                return Selection == null ? 0 : Selection.Selection.Count;
-            }
+            get { return SelectionManager == null ? 0 : SelectionManager.Selection.Count; }
+        }
+
+        private Vector2 CameraPosition
+        {
+            get { return SF_Editor.instance.nodeView.cameraPos; }
         }
 
         private Vector2 _scrollPosition;
@@ -165,28 +167,64 @@ namespace LennardF1989.UnityScripts.ShaderForge
 
         private void InternalLoad(string fileName)
         {
-            if (Selection == null || string.IsNullOrEmpty(fileName))
+            if (SelectionManager == null || string.IsNullOrEmpty(fileName))
             {
                 return;
             }
 
             EditorPrefs.SetString("shaderforge_clipboard", File.ReadAllText(fileName));
 
-            Selection.PasteFromClipboard();
+            Vector2 targetPosition = (SelectionCount == 0) ? CameraPosition : GetSelectionPosition();
+
+            SelectionManager.PasteFromClipboard();
+
+            MoveSelectionTo(targetPosition + new Vector2(64f, 64f));
 
             EditorPrefs.SetString("shaderforge_clipboard", string.Empty);
 
             GetWindow<SF_Editor>().Focus();
         }
 
+        private Vector2 GetSelectionPosition()
+        {
+            float minX = SelectionManager.Selection[0].rect.x;
+            float minY = SelectionManager.Selection[0].rect.y;
+
+            foreach (SF_Node node in SelectionManager.Selection)
+            {
+                if (node.rect.x < minX)
+                {
+                    minX = node.rect.x;
+                }
+
+                if (node.rect.y < minY)
+                {
+                    minY = node.rect.y;
+                }
+            }
+
+            return new Vector2(minX, minY);
+        }
+
+        private void MoveSelectionTo(Vector2 targetPosition)
+        {
+            Vector2 selectionPosition = GetSelectionPosition();
+
+            foreach (SF_Node node in SelectionManager.Selection)
+            {
+                node.rect.x = (node.rect.x - selectionPosition.x) + targetPosition.x;
+                node.rect.y = (node.rect.y - selectionPosition.y) + targetPosition.y;
+            }
+        }
+
         private void Save()
         {
-            if(Selection == null || SelectionCount == 0)
+            if(SelectionManager == null || SelectionCount == 0)
             {
                 return;
             }
 
-            string fileContents = string.Join("\n", Selection.GetSelectionSerialized());
+            string fileContents = string.Join("\n", SelectionManager.GetSelectionSerialized());
 
             string fileName = EditorUtility.SaveFilePanel(
                 "Save selection to file",
