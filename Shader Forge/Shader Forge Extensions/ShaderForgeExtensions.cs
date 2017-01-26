@@ -1,6 +1,6 @@
 ﻿/**
  * Title: Shader Forge Extensions
- * Version: 1.2
+ * Version: 1.3
  * 
  * Author: Lennard Fonteijn
  * Website: http://www.lennardf1989.com
@@ -60,7 +60,7 @@ namespace LennardF1989.UnityScripts.ShaderForge
             GetWindow<ShaderForgeExtensions>();
         }
 
-        public ShaderForgeExtensions()
+        public void OnEnable()
         {
             HOPanelUtils.SetWindowTitle(this, SF_GUI.Icon, "SF Extensions");
 
